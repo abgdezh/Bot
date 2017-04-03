@@ -105,14 +105,15 @@ class TelegramBot:
                     msg_id, query_type = data.split('#')
                     message = Message.Message(message_id=int(msg_id))
                     message.respond(self.incoming_messages[user_id],
+                                    self.messages_to_send[user_id],
                                     int(query_type))
                 elif update.message:
-                    text = update.message.text
-                    self.messages_handler(update.message)
+                    self.messages_handler(update.message, user_id)
             time.sleep(0.1)
 
-    def messages_handler(self, message):
-        print("I've got a message!", message)
+    def messages_handler(self, message, user_id):
+        self.messages_to_send[user_id].append(
+            {'text': str(user_id) + ' wrote me a message: ' + str(message)})
 
     def updater(self, user_id):
         while True:
@@ -132,10 +133,3 @@ class TelegramBot:
                     self.send_message(user_id, query['text'])
                 time.sleep(1)
             time.sleep(0.1)
-
-    def add_message_to_queue(self, user_id, formatted_message, **kwargs):
-        msg_dict = kwargs
-        msg_dict['text'] = formatted_message
-        if user_id not in self.messages_to_send:
-            self.begin_interaction_with_user(user_id)
-        self.messages_to_send[user_id].append(msg_dict)

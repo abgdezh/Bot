@@ -38,8 +38,9 @@ class Message:
     def send(self):
         pass
 
-    def respond(self, queue, query_type):
-        print("Inline button pressed", queue, query_type)
+    def respond(self, incoming_messages_queue, messages_to_send, query_type):
+        messages_to_send.append({
+            'text': 'Responding to ' + self.text + ", " + query_type})
 
     def get_user_id(self):
         try:
@@ -73,6 +74,7 @@ class Message:
         stream_type = self.get_stream_type()
         if stream_type == 'vk_msg':
             pass
+
 
 def get_max_id():
     try:
