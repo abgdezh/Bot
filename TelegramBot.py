@@ -16,8 +16,11 @@ class TelegramBot:
             self.token = ''
         self.bot = telegram.Bot(token=self.token)
         self.update_id = 0
-        self.queries_queues = {}
-        self.responses_queues = {}
+        self.incoming_messages = {}
+        self.messages_to_send = {}
+
+    def start(self):
+        threading.Thread(target=self.parse_incoming_messages).start()
 
     def get_updates(self):
         updates = []
@@ -34,7 +37,8 @@ class TelegramBot:
 
     def send_message(self, chat_id, text):
         try:
-            self.bot.sendMessage(text=text, chat_id=chat_id)
+            self.bot.sendMessage(text=text, chat_id=chat_id,
+                                 parse_mode=telegram.ParseMode.HTML)
             return True
         except:
             return False
@@ -75,50 +79,63 @@ class TelegramBot:
             time.sleep(0.1)
             for update in updates:
                 if update.callback_query:
-                    user_id = update.callback_query.chat_id
+                    user_id = update.callback_query.from_user.id
                 elif update.message:
                     user_id = update.message.chat_id
                 else:
                     continue
-                if user_id not in self.queries_queues:
-                    self.queries_queues[user_id] = collections.deque()
-                    self.responses_queues[user_id] = collections.deque()
-                    threading.Thread(target=self.queries_handler,
-                                     args=(user_id,)).start()
-                    threading.Thread(target=self.updater,
-                                     args=(user_id,)).start()
-                self.queries_queues[user_id].append(update)
+                if user_id not in self.incoming_messages:
+                    self.begin_interaction_with_user(user_id)
+                self.incoming_messages[user_id].append(update)
+
+    def begin_interaction_with_user(self, user_id):
+        self.incoming_messages[user_id] = collections.deque()
+        self.messages_to_send[user_id] = collections.deque()
+        threading.Thread(target=self.queries_handler,
+                         args=(user_id,)).start()
+        threading.Thread(target=self.updater,
+                         args=(user_id,)).start()
 
     def queries_handler(self, user_id):
         while True:
-            while len(self.queries_queues[user_id]):
-                update = self.queries_queues[user_id].popleft()
+            while len(self.incoming_messages[user_id]):
+                update = self.incoming_messages[user_id].popleft()
                 if update.callback_query:
                     data = update.callback_query.data
                     msg_id, query_type = data.split('#')
                     message = Message.Message(message_id=int(msg_id))
-                    message.respond(self.queries_queues[user_id],
+                    message.respond(self.incoming_messages[user_id],
                                     int(query_type))
                 elif update.message:
                     text = update.message.text
-                    self.command_handler(update.message)
+                    self.messages_handler(update.message)
             time.sleep(0.1)
 
-    def command_handler(self, message):
-        pass
+    def messages_handler(self, message):
+        print("I've got a message!", message)
 
     def updater(self, user_id):
         while True:
-            while len(self.responses_queues[user_id]):
-                query = self.responses_queues[user_id].popleft()
+            while len(self.messages_to_send[user_id]):
+                query = self.messages_to_send[user_id].popleft()
                 if 'keyboard' in query:
                     self.send_keyboard(user_id, query['text'],
                                        query['keyboard'])
                 elif 'inline_keyboard' in query:
-                    self.send_keyboard(user_id, query['text'],
-                                       query['inline_keyboard'])
+                    self.send_inline_keyboard(user_id, query['text'],
+                                              query['inline_keyboard'])
                 elif 'photo' in query:
-                    self.bot.send_photo()
+                    self.bot.send_photo(user_id, query['photo'],
+                                        caption="" if 'text' not in query else
+                                        query['text'])
                 else:
                     self.send_message(user_id, query['text'])
-            time.sleep(1)
+                time.sleep(1)
+            time.sleep(0.1)
+
+    def add_message_to_queue(self, user_id, formatted_message, **kwargs):
+        msg_dict = kwargs
+        msg_dict['text'] = formatted_message
+        if user_id not in self.messages_to_send:
+            self.begin_interaction_with_user(user_id)
+        self.messages_to_send[user_id].append(msg_dict)

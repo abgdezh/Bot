@@ -1,5 +1,4 @@
 import postgresql
-import VkUtil
 
 
 class Message:
@@ -40,7 +39,7 @@ class Message:
         pass
 
     def respond(self, queue, query_type):
-        pass
+        print("Inline button pressed", queue, query_type)
 
     def get_user_id(self):
         try:
