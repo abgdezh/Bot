@@ -1,4 +1,4 @@
-from Message import Message
+from Messages.Message import Message
 
 
 class VkMessage(Message):

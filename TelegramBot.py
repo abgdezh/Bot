@@ -1,9 +1,11 @@
 import collections
 import threading
+import time
+
 import postgresql
 import telegram
-import time
-import Message
+
+import Messages.message_loader
 
 
 class TelegramBot:
@@ -53,7 +55,8 @@ class TelegramBot:
         try:
             self.bot.send_message(chat_id=chat_id, text=text,
                                   reply_markup=telegram.InlineKeyboardMarkup(
-                                      button_arr))
+                                      button_arr),
+                                  parse_mode=telegram.ParseMode.HTML)
             return True
         except:
             return False
@@ -68,7 +71,8 @@ class TelegramBot:
         try:
             self.bot.send_message(chat_id=chat_id, text=text,
                                   reply_markup=telegram.ReplyKeyboardMarkup(
-                                      button_arr))
+                                      button_arr),
+                                  parse_mode=telegram.ParseMode.HTML)
             return True
         except:
             return False
@@ -86,36 +90,40 @@ class TelegramBot:
                     continue
                 if user_id not in self.incoming_messages:
                     self.begin_interaction_with_user(user_id)
-                self.incoming_messages[user_id].append(update)
+                self.incoming_messages[user_id].put_message(update)
 
     def begin_interaction_with_user(self, user_id):
-        self.incoming_messages[user_id] = collections.deque()
+        self.incoming_messages[user_id] = IncomingMessagesQueue()
         self.messages_to_send[user_id] = collections.deque()
         threading.Thread(target=self.queries_handler,
                          args=(user_id,)).start()
-        threading.Thread(target=self.updater,
+        threading.Thread(target=self.message_sender,
                          args=(user_id,)).start()
 
     def queries_handler(self, user_id):
         while True:
-            while len(self.incoming_messages[user_id]):
-                update = self.incoming_messages[user_id].popleft()
-                if update.callback_query:
-                    data = update.callback_query.data
-                    msg_id, query_type = data.split('#')
-                    message = Message.Message(message_id=int(msg_id))
-                    message.respond(self.incoming_messages[user_id],
-                                    self.messages_to_send[user_id],
-                                    int(query_type))
-                elif update.message:
-                    self.messages_handler(update.message, user_id)
-            time.sleep(0.1)
+            update = self.incoming_messages[user_id].get_message()
+            if update.callback_query:
+                data = update.callback_query.data
+                msg_id, query_type = data.split('#')
+                message = Messages.message_loader.load_from_database(
+                    message_id=int(msg_id))
+                if message is None:
+                    self.messages_to_send[user_id].append(
+                        {'text': 'Message not found!'}
+                    )
+                    continue
+                message.respond(self.incoming_messages[user_id],
+                                self.messages_to_send[user_id],
+                                int(query_type))
+            elif update.message:
+                self.messages_handler(update.message, user_id)
 
     def messages_handler(self, message, user_id):
         self.messages_to_send[user_id].append(
             {'text': str(user_id) + ' wrote me a message: ' + str(message)})
 
-    def updater(self, user_id):
+    def message_sender(self, user_id):
         while True:
             while len(self.messages_to_send[user_id]):
                 query = self.messages_to_send[user_id].popleft()
@@ -133,3 +141,22 @@ class TelegramBot:
                     self.send_message(user_id, query['text'])
                 time.sleep(1)
             time.sleep(0.1)
+
+
+class IncomingMessagesQueue:
+    def __init__(self):
+        self.queue = collections.deque()
+        self.len = 0
+
+    def put_message(self, msg):
+        self.queue.append(msg)
+        self.len += 1
+
+    def get_message(self):
+        while not len(self.queue):
+            time.sleep(0.1)
+        self.len -= 1
+        return self.queue.popleft()
+
+    def __len__(self):
+        return self.len

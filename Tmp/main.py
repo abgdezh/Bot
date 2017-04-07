@@ -16,7 +16,7 @@ from VkUtil import VkUtil
 t = VkUtil()
 #t.update_messages()
 
-import Message
+from Messages import Message
 import datetime
 
 m = Message.Message()
