@@ -2,7 +2,7 @@ import postgresql
 
 from Messages.Message import Message
 from Messages.VkMessage import VkMessage
-from Messages.VkWall import VkWall
+from Messages.VkWallMessage import VkWallMessage
 
 
 def load_from_database(message_id):
@@ -38,7 +38,7 @@ def get_stream_type_by_message_id(message_id):
 
 def create_message_by_stream_type(stream_type):
     d = {'vk-msg': VkMessage,
-         'vk-wall': VkWall}
+         'vk-wall': VkWallMessage}
     if stream_type not in d:
         return Message()
     return d[stream_type]()

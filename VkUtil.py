@@ -18,11 +18,11 @@ class VkUtil:
                             JOIN accounts USING (account_id)
                             WHERE token = \'''' + self.token + "') " +
                     '''SELECT original_id
-                        FROM stream_ids
-                        NATURAL JOIN messages
-                        ORDER BY original_id DESC;'''
+                        FROM'''  # stream_ids
+                    # NATURAL JOIN
+                    ''' messages
+                    ORDER BY original_id DESC;'''
                 )
-                print(message_ids)
                 if message_ids:
                     self.first_message_id = message_ids[0][0]
                 else:
@@ -56,15 +56,27 @@ class VkUtil:
                 else:
                     return []  # handling other errors is senseless
             messages += new_messages['items']
-            print(len(messages))
             self.first_message_id += 100
             if self.first_message_id >= last_message_id:
-                self.first_message_id = messages[-1]['id']
+                if messages:
+                    self.first_message_id = messages[-1]['id']
+                else:
+                    self.first_message_id -= 100
                 break
         return messages
 
     def send_message(self, user_id, message_text):
         self.vk.messages.send(user_id=user_id, message=message_text)
+
+    def like_post(self, wall_id, post_id):
+        self.vk.likes.add(type='post', owner_id=wall_id, item_id=post_id)
+
+    def share_post(self, wall_id, post_id):
+        self.vk.wall.repost(object='wall' + str(wall_id) + '_' + str(post_id))
+
+    def comment_post(self, wall_id, post_id, message):
+        self.vk.wall.createComment(owner_id=wall_id, post_id=post_id,
+                             message=message)
 
     def get_user(self, user_id=None, cache={}):
         if user_id in cache:
@@ -76,6 +88,16 @@ class VkUtil:
                 res = self.vk.users.get()[0]
             cache[user_id] = res['first_name'] + ' ' + res['last_name']
             return cache[user_id]
+        except Exception as e:
+            return ''
+
+    def get_group(self, group_id, cache={}):
+        if group_id in cache:
+            return cache[group_id]
+        try:
+            res = self.vk.groups.getById(group_id=group_id)['response']
+            cache[group_id] = res['name']
+            return cache[group_id]
         except Exception as e:
             return ''
 

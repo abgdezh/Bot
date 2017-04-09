@@ -42,7 +42,7 @@ class VkMessage(Message):
             res = '<b>' + self.title + '</b>\n'
         else:
             res = ''
-        res += self.text + '\n' + '<b>' + self.author + '</b>\n' + '<i>' + str(
+        res += '<b>' + self.author + '</b>\n' + self.text + '\n' + '<i>' + str(
             self.date) + '</i>'
         return res
 
@@ -55,7 +55,7 @@ class VkMessage(Message):
                 {'text': 'Please, type your message:'})
             while True:
                 update = incoming_messages_queue.get_message()
-                if update.message:
+                if update.message is not None:
                     vk_instance.send_message(
                         user_id=get_original_stream_id(self.message_id),
                         message_text=update.message.text)

@@ -120,8 +120,22 @@ class TelegramBot:
                 self.messages_handler(update.message, user_id)
 
     def messages_handler(self, message, user_id):
-        self.messages_to_send[user_id].append(
-            {'text': str(user_id) + ' wrote me a message: ' + str(message)})
+        text = message.text
+        if text == '/start':
+            self.messages_to_send[user_id].append({
+                'text': 'Main menu',
+                'keyboard': [
+                    ["Add source"],
+                    ["Remove source"],
+                    ["Mute source"]
+                ]
+            })
+        if text == 'Add source':
+            pass
+        if text == 'Remove source':
+            pass
+        if text == 'Mute source':
+            pass
 
     def message_sender(self, user_id):
         while True:
