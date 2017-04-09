@@ -1,0 +1,75 @@
+
+\documentclass[a4paper,12pt]{article} %% добавить leqno в [] для нумерации слева
+
+
+\usepackage{ textcomp }
+\usepackage{ gensymb }
+
+%%%cross
+\usepackage{ marvosym }
+
+%%% Пустое множество
+%%%\usepackage{ wasysym }
+
+%%% Для команды mathds(Обозначение множества натур. чисел и т.д.)
+\usepackage{ dsfont }
+
+
+%%% Подчеркивание текста
+\usepackage[normalem]{ulem}
+
+%%% Работа с русским языком
+\usepackage{cmap}					% поиск в PDF
+\usepackage{mathtext} 				% русские буквы в формулах
+\usepackage[T2A]{fontenc}			% кодировка
+\usepackage[utf8]{inputenc}			% кодировка исходного текста
+\usepackage[english,russian]{babel}	% локализация и переносы
+
+%%% Дополнительная работа с математикой
+\usepackage{amsmath,amsfonts,amssymb,amsthm,mathtools} %% AMS
+\usepackage{icomma} % "Умная" запятая: $0,2$ --- число, $0, 2$ --- перечисление
+
+%% Номера формул
+%\mathtoolsset{showonlyrefs=true} % Показывать номера только у тех формул, на которые есть \eqref{} в тексте.
+
+%% Шрифты
+\usepackage{euscript}	 % Шрифт Евклид
+\usepackage{mathrsfs} % Красивый матшрифт
+
+%% Свои команды
+%\DeclareMathOperator{\sgn}{\mathop{sgn}}
+
+%% Перенос знаков в формулах (по Львовскому)
+\newcommand*{\hm}[1]{#1\nobreak\discretionary{}
+{\hbox{$\mathsurround=0pt #1$}}{}}
+
+%%% Заголовок
+\author{Богомолов Михаил. Весельев Александр}
+\title{Telegram bot Aggregator }
+\date{\today}
+
+\begin{document}
+	\maketitle
+	\section*{Technical task}
+		Aggregator bot представляет
+		из себя бота-помощника в мессенджере Telegram. Язык программирования - 
+		Python.
+		Данный бот ставит перед собой задачу облегчения получения информации для
+		пользователя из различных источников.
+		Aggregator осуществляет выгрузку интересных для пользователя постов и
+		сообщений из
+		различных соц. сетей (на данный момент разрабатывается только поддержка 
+		выгрузки постов и сообщений из vk.com)
+	\section*{User-stories}
+		\begin{enumerate}
+			\item Как пользователь, я хочу сохранять посты, с той целью,
+			что если они будут удалены из соц. сети я бы мог получить к ним доступ  
+			\item Как пользователь, я хочу получать всю интересующую меня информацию
+			из соц. сетей по запросу, чтобы она была собрана в одном месте, и мне не приходилось
+			бы постоянно её искать в различных источниках
+			\item Как обладатель нескольких страниц в разных соц. сетях, я хочу,
+			чтобы вся информация собиралась в одном месте, и вместо просмотра 
+			нескольких страниц мне достаточно было бы посмотреть её в одном Telegram
+			чате.
+		\end{enumerate}
+\end{document}
