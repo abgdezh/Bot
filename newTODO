@@ -1,0 +1,5 @@
+Create saving vk-messages to DB
+Create saving vk-posts to DB
+
+Create thread which will monitor DB and write messages (select * from
+messages where not was_archived and date < today())
