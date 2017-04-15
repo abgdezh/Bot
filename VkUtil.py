@@ -5,23 +5,21 @@ import vk_api
 
 
 class VkUtil:
-    def __init__(self, user_id):
+    def __init__(self, account_id):
+        self.account_id = account_id
         try:
             with postgresql.open('mb:qwerty@localhost:5432/bot') as db:
                 self.token = db.query(
-                    "select token from accounts where "
-                    "account_type = 'vk' and user_id=" + str(user_id))[0][0]
+                    "SELECT token "
+                    "FROM accounts "
+                    "WHERE account_id = {0}".format(account_id))[0][0]
                 message_ids = db.query(
-                    '''WITH stream_ids AS
-                            (SELECT stream_id
-                            FROM streams
-                            JOIN accounts USING (account_id)
-                            WHERE token = \'''' + self.token + "') " +
-                    '''SELECT original_id
-                        FROM'''  # stream_ids
-                    # NATURAL JOIN
-                    ''' messages
-                    ORDER BY original_id DESC;'''
+                    'SELECT message_id '
+                    'FROM records '
+                    'NATURAL JOIN vk_message '
+                    'WHERE account_id = {0} '
+                    'ORDER BY message_id DESC '
+                    'LIMIT 1'.format(account_id)
                 )
                 if message_ids:
                     self.first_message_id = message_ids[0][0]
@@ -30,7 +28,7 @@ class VkUtil:
         except Exception as e:
             print(e)
             return
-        vk_session = vk_api.VkApi(token=self.token)
+        vk_session = vk_api.VkApi(token=self.token, api_version='5.63')
         vk_session.auth()
         self.vk = vk_session.get_api()
 
@@ -68,6 +66,9 @@ class VkUtil:
     def send_message(self, user_id, message_text):
         self.vk.messages.send(user_id=user_id, message=message_text)
 
+    def get_post(self, wall_id):
+        return self.vk.wall.get(owner_id=wall_id, count=1)['items'][0]
+
     def like_post(self, wall_id, post_id):
         self.vk.likes.add(type='post', owner_id=wall_id, item_id=post_id)
 
@@ -76,9 +77,9 @@ class VkUtil:
 
     def comment_post(self, wall_id, post_id, message):
         self.vk.wall.createComment(owner_id=wall_id, post_id=post_id,
-                             message=message)
+                                   message=message)
 
-    def get_user(self, user_id=None, cache={}):
+    def get_user_name(self, user_id=None, cache={}):
         if user_id in cache:
             return cache[user_id]
         try:
@@ -91,7 +92,14 @@ class VkUtil:
         except Exception as e:
             return ''
 
-    def get_group(self, group_id, cache={}):
+    def get_own_id(self):
+        try:
+            return self.vk.users.get()[0]['id']
+        except Exception as e:
+            print(e)
+            return 0
+
+    def get_group_name(self, group_id, cache={}):
         if group_id in cache:
             return cache[group_id]
         try:
@@ -100,6 +108,3 @@ class VkUtil:
             return cache[group_id]
         except Exception as e:
             return ''
-
-
-vk_instance = VkUtil(62827234)

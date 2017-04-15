@@ -1,21 +1,23 @@
 import collections
 import threading
 import time
+from sys import stderr
 
 import postgresql
 import telegram
 
-import Messages.message_loader
+import Records.record_loader
 
 
 class TelegramBot:
     def __init__(self):
         try:
             with postgresql.open('mb:qwerty@localhost:5432/bot') as db:
-                self.token = db.query("select token from accounts where "
+                self.token = db.query("SELECT token FROM accounts WHERE "
                                       "account_type = 'tg_bot'")[0][0]
         except:
-            self.token = ''
+            print("Cannot load telegram bot token!", file=stderr)
+            exit(1)
         self.bot = telegram.Bot(token=self.token)
         self.update_id = 0
         self.incoming_messages = {}
@@ -90,7 +92,7 @@ class TelegramBot:
                     continue
                 if user_id not in self.incoming_messages:
                     self.begin_interaction_with_user(user_id)
-                self.incoming_messages[user_id].put_message(update)
+                self.incoming_messages[user_id].push(update)
 
     def begin_interaction_with_user(self, user_id):
         self.incoming_messages[user_id] = IncomingMessagesQueue()
@@ -102,20 +104,20 @@ class TelegramBot:
 
     def queries_handler(self, user_id):
         while True:
-            update = self.incoming_messages[user_id].get_message()
+            update = self.incoming_messages[user_id].pop()
             if update.callback_query:
                 data = update.callback_query.data
-                msg_id, query_type = data.split('#')
-                message = Messages.message_loader.load_from_database(
-                    message_id=int(msg_id))
-                if message is None:
+                record_id, query_type = data.split('#')
+                record = Records.record_loader.load_from_database(
+                    record_id=int(record_id))
+                if record is None:
                     self.messages_to_send[user_id].append(
-                        {'text': 'Message not found!'}
+                        {'text': 'Record not found!'}
                     )
                     continue
-                message.respond(self.incoming_messages[user_id],
-                                self.messages_to_send[user_id],
-                                int(query_type))
+                record.respond(self.incoming_messages[user_id],
+                               self.messages_to_send[user_id],
+                               int(query_type))
             elif update.message:
                 self.messages_handler(update.message, user_id)
 
@@ -149,7 +151,7 @@ class TelegramBot:
                                               query['inline_keyboard'])
                 elif 'photo' in query:
                     self.bot.send_photo(user_id, query['photo'],
-                                        caption="" if 'text' not in query else
+                                        caption='' if 'text' not in query else
                                         query['text'])
                 else:
                     self.send_message(user_id, query['text'])
@@ -162,11 +164,11 @@ class IncomingMessagesQueue:
         self.queue = collections.deque()
         self.len = 0
 
-    def put_message(self, msg):
+    def push(self, msg):
         self.queue.append(msg)
         self.len += 1
 
-    def get_message(self):
+    def pop(self):
         while not len(self.queue):
             time.sleep(0.1)
         self.len -= 1
