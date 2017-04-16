@@ -1,6 +1,5 @@
 CREATE TABLE records (
   record_id       BIGSERIAL PRIMARY KEY,
-  subscription_id INTEGER REFERENCES subscriptions,
   record_type     VARCHAR,
   account_id      INTEGER,
   seen            BOOLEAN
