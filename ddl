@@ -1,8 +1,9 @@
 CREATE TABLE records (
-  record_id   BIGSERIAL PRIMARY KEY,
-  record_type VARCHAR,
-  account_id  INTEGER,
-  seen        BOOLEAN
+  record_id       BIGSERIAL PRIMARY KEY,
+  subscription_id INTEGER REFERENCES subscriptions,
+  record_type     VARCHAR,
+  account_id      INTEGER,
+  seen            BOOLEAN
 );
 
 CREATE TABLE vk_message (
@@ -42,14 +43,6 @@ CREATE TABLE vk_user_info (
   info_type VARCHAR,
   value     VARCHAR
 );
-
-
-
-
-
-
-
-
 
 
 CREATE TABLE subscriptions (
