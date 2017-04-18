@@ -1,5 +1,14 @@
+CREATE TABLE users (
+  account_id		SERIAL PRIMARY KEY,
+  user_id		INTEGER,
+  account_type		TEXT,
+  user_name		CHAR[255],
+  last_time_online 	TIMESTAMP
+);
+
 CREATE TABLE records (
   record_id       BIGSERIAL PRIMARY KEY,
+  account_id 	  INTEGER REFERENCEES users
   record_type     VARCHAR,
   account_id      INTEGER,
   seen            BOOLEAN
