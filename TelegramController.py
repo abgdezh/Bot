@@ -4,9 +4,13 @@ import time
 from sys import stderr
 
 import postgresql
+import sys
 import telegram
 
 import Records.record_loader
+from account_utils import get_user_id_by_account_id
+from CommandHandlers import *
+from Records.record_loader import load_from_database
 
 
 class TelegramBot:
@@ -15,31 +19,42 @@ class TelegramBot:
             with postgresql.open('mb:qwerty@localhost:5432/bot') as db:
                 self.token = db.query("SELECT token FROM accounts WHERE "
                                       "account_type = 'tg_bot'")[0][0]
-        except:
+        except Exception:
             print("Cannot load telegram bot token!", file=stderr)
-            exit(1)
+            sys.exit(1)
         self.bot = telegram.Bot(token=self.token)
-        self.update_id = 0
+        self.last_update_id = 0
         self.incoming_messages = {}
         self.messages_to_send = {}
 
     def start(self):
-        threading.Thread(target=self.parse_incoming_messages).start()
+        threading.Thread(target=self.distribute_incoming_queries).start()
+        threading.Thread(target=self.monitor_database_updates).start()
 
     def get_updates(self):
+        """
+        Gets new messages sent to bot.
+        :return: array of telegram messages
+        """
         updates = []
         while True:
             try:
-                new_updates = self.bot.getUpdates(offset=self.update_id)
+                new_updates = self.bot.getUpdates(offset=self.last_update_id)
             except:
                 return updates
             if not new_updates:
                 break
-            self.update_id = new_updates[-1].update_id + 1
+            self.last_update_id = new_updates[-1].update_id + 1
             updates += new_updates
         return updates
 
     def send_message(self, chat_id, text):
+        """
+        Sends message from the bot
+        :param chat_id: id of user
+        :param text: text in html format
+        :return: True if message was sent, False otherwise
+        """
         try:
             self.bot.sendMessage(text=text, chat_id=chat_id,
                                  parse_mode=telegram.ParseMode.HTML)
@@ -48,6 +63,15 @@ class TelegramBot:
             return False
 
     def send_inline_keyboard(self, chat_id, text, keyboard):
+        """
+        Sends inline keyboard.
+        :param chat_id: id of user
+        :param text: text in html format
+        :param keyboard: Keyboard in format [[('Button text', 
+        'http://example.com/link/to/open/on/click', 'Data to be sent back 
+        after click')]]
+        :return: True if message was sent, False otherwise
+        """
         button_arr = []
         for i in keyboard:
             button_arr.append([])
@@ -64,6 +88,13 @@ class TelegramBot:
             return False
 
     def send_keyboard(self, chat_id, text, keyboard):
+        """
+        Sends keyboard.
+        :param chat_id: id of user
+        :param text: text in html format
+        :param keyboard: array of array of strings
+        :return: True if message was sent, False otherwise
+        """
         button_arr = []
         for i in keyboard:
             button_arr.append([])
@@ -79,10 +110,18 @@ class TelegramBot:
         except:
             return False
 
-    def parse_incoming_messages(self):
+    def send_document(self, chat_id, text, path_to_file):
+        try:
+            self.bot.sendDocument(caption=text, chat_id=chat_id,
+                                  document=open(path_to_file, 'rb'))
+            return True
+        except Exception as e:
+            print(e)
+            return False
+
+    def distribute_incoming_queries(self):
         while True:
             updates = self.get_updates()
-            time.sleep(0.1)
             for update in updates:
                 if update.callback_query:
                     user_id = update.callback_query.from_user.id
@@ -93,6 +132,7 @@ class TelegramBot:
                 if user_id not in self.incoming_messages:
                     self.begin_interaction_with_user(user_id)
                 self.incoming_messages[user_id].push(update)
+            time.sleep(0.1)
 
     def begin_interaction_with_user(self, user_id):
         self.incoming_messages[user_id] = IncomingMessagesQueue()
@@ -123,21 +163,19 @@ class TelegramBot:
 
     def messages_handler(self, message, user_id):
         text = message.text
-        if text == '/start':
-            self.messages_to_send[user_id].append({
-                'text': 'Main menu',
-                'keyboard': [
-                    ["Add source"],
-                    ["Remove source"],
-                    ["Mute source"]
-                ]
-            })
-        if text == 'Add source':
-            pass
-        if text == 'Remove source':
-            pass
-        if text == 'Mute source':
-            pass
+        methods = {'/start': start,
+                   'Add vk account': add_vk_account,
+                   'Add source': add_source,
+                   'Remove source': remove_source,
+                   'Exit': lambda a, b: start(a, b, False),
+                   '/ls': ls
+                   }
+        if text in methods:
+            methods[text](self, user_id)
+        elif text.startswith('/cd '):
+            cd(self, user_id, text.split('/cd ')[1])
+        elif text.startswith('/get '):
+            get(self, user_id, text.split('/get ')[1])
 
     def message_sender(self, user_id):
         while True:
@@ -153,10 +191,39 @@ class TelegramBot:
                     self.bot.send_photo(user_id, query['photo'],
                                         caption='' if 'text' not in query else
                                         query['text'])
+                elif 'document' in query:
+                    self.send_document(
+                        user_id,
+                        '' if 'text' not in query else query['text'],
+                        query['document']
+                    )
                 else:
                     self.send_message(user_id, query['text'])
                 time.sleep(1)
             time.sleep(0.1)
+
+    def monitor_database_updates(self):
+        while True:
+            time.sleep(1)
+            try:
+                with postgresql.open('mb:qwerty@localhost:5432/bot') as db:
+                    records = \
+                        db.query('SELECT record_id '
+                                 'FROM records '
+                                 'WHERE seen = FALSE '
+                                 'AND date_to_show < current_timestamp '
+                                 'LIMIT 1')
+                    if not records:
+                        continue
+                    record_id = records[0][0]
+                    record = load_from_database(record_id)
+                    user_id = get_user_id_by_account_id(record.account_id)
+                    if user_id not in self.messages_to_send:
+                        self.begin_interaction_with_user(user_id)
+                    record.send(self.messages_to_send[user_id])
+            except Exception as e:
+                print("monitor_database_updates failed")
+                print(e)
 
 
 class IncomingMessagesQueue:
@@ -173,6 +240,12 @@ class IncomingMessagesQueue:
             time.sleep(0.1)
         self.len -= 1
         return self.queue.popleft()
+
+    def pop_message(self):
+        while True:
+            update = self.pop()
+            if update.message is not None:
+                return update.message
 
     def __len__(self):
         return self.len
