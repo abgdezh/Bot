@@ -1,8 +1,17 @@
+CREATE TABLE accounts (
+  account_id		SERIAL PRIMARY KEY,
+  user_id		INTEGER,
+  account_type		VARCHAR,
+  user_name		VARCHAR,
+  last_time_online 	TIMESTAMP
+);
+
 CREATE TABLE records (
-  record_id   BIGSERIAL PRIMARY KEY,
-  record_type VARCHAR,
-  account_id  INTEGER,
-  seen        BOOLEAN
+  record_id       BIGSERIAL PRIMARY KEY,
+  account_id 	  INTEGER REFERENCES accounts,
+  record_type     VARCHAR,
+  account_id      INTEGER,
+  seen            BOOLEAN
 );
 
 CREATE TABLE vk_message (
@@ -42,10 +51,6 @@ CREATE TABLE vk_user_info (
   info_type VARCHAR,
   value     VARCHAR
 );
-
-
-
-
 
 
 CREATE TABLE subscriptions (
